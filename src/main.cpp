@@ -1,70 +1,61 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <time.h>
+#include <sntp.h>
 
-// ---------------- WiFi ----------------
-const char* ssid = "Wifi19-1-10";
+const char* ssid = "Wifo19-1-10";
 const char* password = "880002770";
-
-// ---------------- NTP ----------------
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
-
-// ---------------- Danish names ----------------
-String weekdayName(int wday) {
-  const char* names[] = {
-    "Søndag", "Mandag", "Tirsdag", "Onsdag",
-    "Torsdag", "Fredag", "Lørdag"
-  };
-  return names[wday];
-}
-
-String monthName(int month) {
-  const char* names[] = {
-    "Januar", "Februar", "Marts", "April", "Maj", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "December"
-  };
-  return names[month];
-}
+const char* weekdays_da[] = {
+  "søndag",
+  "mandag",
+  "tirsdag",
+  "onsdag",
+  "torsdag",
+  "fredag",
+  "lørdag"
+};
 
 void setup() {
   Serial.begin(115200);
-  delay(300);
-
-  Serial.print("Connecting to WiFi");
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
   }
-  Serial.println("\nConnected!");
 
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  Serial.println("Time synchronized");
+  Serial.println("Connected to WiFi");
+
+  configTime(3600, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.println("Timezone: GMT+1");
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
+  }
 }
 
 void loop() {
-  struct tm timeinfo;
+  static unsigned long lastPrintMillis = 0;
+  const unsigned long intervalMillis = 5000;
 
+  if (millis() - lastPrintMillis < intervalMillis) {
+    return;
+  }
+  lastPrintMillis = millis();
+
+  struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
-    delay(5000);
     return;
   }
 
-  Serial.print("Tidspunkt: ");
-  Serial.printf("%02d:%02d:%02d",
-                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  char dateBuffer[32];
+  strftime(dateBuffer, sizeof(dateBuffer), "%d-%m-%Y", &timeinfo);
+  char timeBuffer[16];
+  strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &timeinfo);
 
-  Serial.print("  |  Dato: ");
-  Serial.printf("%02d ", timeinfo.tm_mday);
-  Serial.print(monthName(timeinfo.tm_mon));
-  Serial.print(" ");
-  Serial.print(timeinfo.tm_year + 1900);
-
-  Serial.print("  |  Ugedag: ");
-  Serial.println(weekdayName(timeinfo.tm_wday));
-
-  delay(5000);
+  const char* weekday = weekdays_da[timeinfo.tm_wday];
+  Serial.printf("Dato: %s, Ugedag: %s, Tid: %s\n", dateBuffer, weekday, timeBuffer);
 }
