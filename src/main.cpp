@@ -15,8 +15,8 @@
 // Forward declaration
 void printLocalTime();
 
-const char* ssid     = "RASPBERRYNET";
-const char* password = "VerySecret";
+const char* ssid     = "Wifi19-1-10";
+const char* password = "880002770";
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 3600;
