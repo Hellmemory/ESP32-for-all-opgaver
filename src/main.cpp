@@ -5,7 +5,7 @@
 // ❗ Не включай sntp.h — он устарел для Arduino-ESP32.
 // #include <sntp.h>  // УДАЛЕНО
 
-const char* ssid     = "Wifo19-1-10";
+const char* ssid     = "Wifi19-1-10";
 const char* password = "880002770";
 
 const char* weekdays_da[] = {
