@@ -1,94 +1,108 @@
+/*
+  Rui Santos
+  Complete project details at https://RandomNerdTutorials.com/esp32-date-time-ntp-client-server-arduino/
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files.
+  
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+*/
 #include <Arduino.h>
 #include <WiFi.h>
-#include <time.h>
+#include "time.h"
 
-// ❗ Не включай sntp.h — он устарел для Arduino-ESP32.
-// #include <sntp.h>  // УДАЛЕНО
+// Forward declaration
+void printLocalTime();
 
-const char* ssid     = "Wifi19-1-10";
-const char* password = "880002770";
+const char* ssid     = "RASPBERRYNET";
+const char* password = "VerySecret";
 
-const char* weekdays_da[] = {
-  "søndag",
-  "mandag",
-  "tirsdag",
-  "onsdag",
-  "torsdag",
-  "fredag",
-  "lørdag"
-};
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 3600;
+const int   daylightOffset_sec = 3600;
 
-void setup() {
+void setup(){
   Serial.begin(115200);
-  delay(100);
 
-  Serial.println("Tilslutter til WiFi...");
-  WiFi.mode(WIFI_STA);
+  // Connect to Wi-Fi
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
   WiFi.begin(ssid, password);
-
-  unsigned long startAttempt = millis();
-  const unsigned long wifiTimeout = 20000; // 20 sek.
-  while (WiFi.status() != WL_CONNECTED && (millis() - startAttempt) < wifiTimeout) {
-    delay(250);
-    Serial.print('.');
-  }
-  Serial.println();
-
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Kunne ikke forbinde til WiFi (timeout).");
-    return;
-  }
-
-  Serial.print("Forbundet til WiFi, IP: ");
-  Serial.println(WiFi.localIP());
-
-  // Настройка SNTP через Arduino API (без sntp.h)
-  // Смещение (сек) использовать не обязательно, если задать TZ.
-  // Для Дании правильнее задать TZ, чтобы летнее время учитывалось автоматически.
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-
-  // TZ для Копенгагена (CET/CEST)
-  // Формат: STD<offset>DST,start,end. Ниже — эквивалент Europe/Copenhagen.
-  setenv("TZ", "CET-1CEST,M3.5.0/2,M10.5.0/3", 1);
-  tzset();
-
-  // Подождём синхронизации времени (не обязательно, но полезно)
-  struct tm timeinfo;
-  int retries = 0;
-  const int maxRetries = 20; // ~10 секунд при задержке 500 мс
-  while (!getLocalTime(&timeinfo) && retries < maxRetries) {
-    retries++;
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    Serial.print(".");
   }
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  
+  // Init and get the time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  printLocalTime();
 
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
-    return;
-  }
-
-  Serial.println("Tid synkroniseret.");
+  //disconnect WiFi as it's no longer needed
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
 }
 
-void loop() {
-  static unsigned long lastPrintMillis = 0;
-  const unsigned long intervalMillis = 5000;
+void loop(){
+  delay(5000);
+  printLocalTime();
+}
 
-  if (millis() - lastPrintMillis < intervalMillis) {
-    return;
-  }
-  lastPrintMillis = millis();
+String getDanskWeekday(int wday) {
+  const char* dage[] = {"Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"};
+  return String(dage[wday]);
+}
 
+String getDanskMonth(int mon) {
+  const char* maaneder[] = {"Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli", "August", "September", "Oktober", "November", "December"};
+  return String(maaneder[mon]);
+}
+
+void printLocalTime(){
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Kunne ikke få tid");
     return;
   }
-
-  char dateBuffer[32];
-  strftime(dateBuffer, sizeof(dateBuffer), "%d-%m-%Y", &timeinfo);
-  char timeBuffer[16];
-  strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &timeinfo);
-
-  const char* weekday = weekdays_da[timeinfo.tm_wday];
-  Serial.printf("Dato: %s, Ugedag: %s, Tid: %s\n", dateBuffer, weekday, timeBuffer);
+  
+  Serial.println("=== AKTUELT TIDSPUNKT ===");
+  
+  char buffer[100];
+  sprintf(buffer, "År: %d", timeinfo.tm_year + 1900);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Måned: %s (%d)", getDanskMonth(timeinfo.tm_mon).c_str(), timeinfo.tm_mon + 1);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Dag: %d", timeinfo.tm_mday);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Ugedag: %s", getDanskWeekday(timeinfo.tm_wday).c_str());
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Time: %02d", timeinfo.tm_hour);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Minut: %02d", timeinfo.tm_min);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Sekund: %02d", timeinfo.tm_sec);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Dag i år: %d", timeinfo.tm_yday);
+  Serial.println(buffer);
+  
+  sprintf(buffer, "Tidspunkt: %s %d. %s %d kl. %02d:%02d:%02d", 
+    getDanskWeekday(timeinfo.tm_wday).c_str(),
+    timeinfo.tm_mday,
+    getDanskMonth(timeinfo.tm_mon).c_str(),
+    timeinfo.tm_year + 1900,
+    timeinfo.tm_hour,
+    timeinfo.tm_min,
+    timeinfo.tm_sec);
+  Serial.println(buffer);
+  
+  Serial.println("========================\n");
 }
